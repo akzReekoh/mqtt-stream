@@ -1,0 +1,32 @@
+{
+  "host": {
+    "type": "String",
+    "label": "Host",
+    "required": true,
+    "help": "The MQTT Host to listen to."
+  },
+  "port": {
+    "type": "Number",
+    "label": "Port",
+    "required": true,
+    "help": "The Port of the MQTT Server to listen to."
+  },
+  "user": {
+    "type": "String",
+    "label": "Username",
+    "help": "(Optional) The username to use if you want to authenticate incoming traffic.",
+    "required": false
+  },
+  "password": {
+    "type": "Password",
+    "label": "Password",
+    "help": "(Optional) The password to use if you want to authenticate incoming traffic.",
+    "required": false
+  },
+  "topic": {
+    "type": "String",
+    "label": "Topic",
+    "required": true,
+    "help": "(Optional) The topic to listen to."
+  }
+}
