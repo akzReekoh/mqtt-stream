@@ -1,5 +1,5 @@
 {
-  "name": "stream-plugin-seed",
+  "name": "mqtt-stream",
   "description": "MQTT Stream Plugin Reekoh IoT Platform. Connects a Reekoh Instance to MQTT Broker/Server.",
   "version": "1.0.0",
   "author": "Reekoh, Inc.",
