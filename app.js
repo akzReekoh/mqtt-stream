@@ -23,6 +23,8 @@ platform.once('close', function () {
 platform.once('ready', function (options) {
     let mqtt = require('mqtt'),
         isEmpty = require('lodash.isempty'),
+        async = require('async'),
+        get = require('lodash.get'),
         connectionParams = {};
 
     if(options.host.endsWith('/'))
@@ -39,8 +41,35 @@ platform.once('ready', function (options) {
     mqttClient = mqtt.connect(connectionParams);
 
     mqttClient.on('message', (topic, payload) => {
-        console.log(topic, payload);
-        platform.processData(topic, payload);
+        payload = payload.toString();
+
+        async.waterfall([
+            async.constant(payload || '{}'),
+            async.asyncify(JSON.parse)
+        ], (error, data) => {
+            if (error || isEmpty(data)) {
+                return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
+            }
+
+            if(isEmpty(get(data, 'device')))
+                return platform.handleException(new Error(`Data should contain a device field. Data: ${data}`));
+
+            platform.requestDeviceInfo(data.device, function (error, requestId) {
+                platform.once(requestId, function (deviceInfo) {
+                    if (deviceInfo) {
+                        platform.processData(data.device, payload);
+
+                        platform.log(JSON.stringify({
+                            title: 'MQTT Stream - Data Received',
+                            device: data.device,
+                            data: data
+                        }));
+                    }
+                    else
+                        platform.handleException(new Error(`Device ${data.device} not registered`));
+                });
+            });
+        });
     });
 
     mqttClient.on('connect', () => {

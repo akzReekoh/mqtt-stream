@@ -1,6 +1,6 @@
 {
   "name": "stream-plugin-seed",
-  "description": "Stream Plugin seed project for the Reekoh IoT Platform. Helps engineers to start developing stream plugins for the Reekoh IoT Platform.",
+  "description": "MQTT Stream Plugin Reekoh IoT Platform. Connects a Reekoh Instance to MQTT Broker/Server.",
   "version": "1.0.0",
   "author": "Reekoh, Inc.",
   "main": "app.js",
@@ -9,9 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Reekoh/stream-plugin-seed"
+    "url": "https://github.com/Reekoh/mqtt-stream"
   },
   "dependencies": {
+    "async": "^2.1.4",
+    "lodash.get": "^4.4.2",
     "lodash.isempty": "^4.4.0",
     "mqtt": "^2.1.3"
   },
