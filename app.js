@@ -51,30 +51,44 @@ platform.once('ready', function (options) {
                 return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
             }
 
-			let deviceId = get(data, options.device_key || 'device');
+            let processData = function (sensorData, cb) {
+				let deviceId = get(sensorData, options.device_key || 'device');
 
-            if(isEmpty(deviceId))
-                return platform.handleException(new Error(`Device ID should be supplied. Data should have a ${options.device_key} property/key. Data: ${data}`));
+				if(isEmpty(deviceId)) {
+					platform.handleException(new Error(`Device ID should be supplied. Data should have a ${options.device_key} property/key. Data: ${sensorData}`));
+					return cb();
+				}
 
-            platform.requestDeviceInfo(deviceId, function (error, requestId) {
-                platform.once(requestId, function (deviceInfo) {
-                    if (deviceInfo) {
-                    	delete data[options.device_key || 'device'];
+				platform.requestDeviceInfo(deviceId, function (error, requestId) {
+					platform.once(requestId, function (deviceInfo) {
+						if (deviceInfo) {
+							delete sensorData[options.device_key || 'device'];
 
-                        platform.processData(deviceId, JSON.stringify(Object.assign(data, {
-                        	device: deviceId
-						})));
+							platform.processData(deviceId, JSON.stringify(Object.assign(sensorData, {
+								device: deviceId
+							})));
 
-                        platform.log(JSON.stringify({
-                            title: 'MQTT Stream - Data Received',
-                            device: data.device,
-                            data: data
-                        }));
-                    }
-                    else
-                        platform.handleException(new Error(`Device ${data.device} not registered`));
-                });
-            });
+							platform.log(JSON.stringify({
+								title: 'MQTT Stream - Data Received',
+								device: sensorData.device,
+								data: sensorData
+							}));
+						}
+						else
+							platform.handleException(new Error(`Device ${sensorData.device} not registered`));
+					});
+				});
+
+				cb();
+			}
+
+            if (Array.isArray(data)) {
+				async.each(data, function (sensorData, cb) {
+					processData(sensorData, cb);
+				});
+			}
+			else
+				processData(data);
         });
     });
 
