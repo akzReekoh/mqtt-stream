@@ -51,13 +51,19 @@ platform.once('ready', function (options) {
                 return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
             }
 
-            if(isEmpty(get(data, 'device')))
-                return platform.handleException(new Error(`Data should contain a device field. Data: ${data}`));
+			let deviceId = get(data, options.device_key || 'device');
 
-            platform.requestDeviceInfo(data.device, function (error, requestId) {
+            if(isEmpty(deviceId))
+                return platform.handleException(new Error(`Device ID should be supplied. Data should have a ${options.device_key} property/key. Data: ${data}`));
+
+            platform.requestDeviceInfo(deviceId, function (error, requestId) {
                 platform.once(requestId, function (deviceInfo) {
                     if (deviceInfo) {
-                        platform.processData(data.device, payload);
+                    	delete data[options.device_key || 'device'];
+
+                        platform.processData(deviceId, JSON.stringify(Object.assign(data, {
+                        	device: deviceId
+						})));
 
                         platform.log(JSON.stringify({
                             title: 'MQTT Stream - Data Received',

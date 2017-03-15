@@ -28,5 +28,11 @@
     "label": "Topic",
     "required": true,
     "help": "The topic to listen to."
+  },
+  "device_key": {
+    "type": "String",
+    "label": "Device ID Property/Key",
+    "required": false,
+    "help": "The key or property where the device id will be pulled from. Defaults to 'device'"
   }
 }
