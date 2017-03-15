@@ -80,7 +80,7 @@ platform.once('ready', function (options) {
 				});
 
 				cb();
-			}
+			};
 
             if (Array.isArray(data)) {
 				async.each(data, function (sensorData, cb) {
