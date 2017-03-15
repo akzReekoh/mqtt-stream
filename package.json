@@ -1,7 +1,7 @@
 {
   "name": "mqtt-stream",
   "description": "MQTT Stream Plugin Reekoh IoT Platform. Connects a Reekoh Instance to MQTT Broker/Server.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Reekoh, Inc.",
   "main": "app.js",
   "scripts": {
@@ -15,7 +15,8 @@
     "async": "=2.1.5",
     "lodash.get": "=4.4.2",
     "lodash.isempty": "=4.4.0",
-    "mqtt": "=2.4.0"
+    "mqtt": "=2.4.0",
+    "uuid": "^3.0.1"
   },
   "devDependencies": {
     "gulp": "=3.9.1",

@@ -1,6 +1,7 @@
 'use strict';
 
 var platform = require('./platform'),
+	uuid     = require('uuid'),
 	mqttClient;
 
 platform.once('close', function () {
@@ -21,40 +22,67 @@ platform.once('close', function () {
 });
 
 platform.once('ready', function (options) {
-    let mqtt = require('mqtt'),
-        isEmpty = require('lodash.isempty'),
-        async = require('async'),
-        get = require('lodash.get'),
-        connectionParams = {};
+	let mqtt             = require('mqtt'),
+		isEmpty          = require('lodash.isempty'),
+		async            = require('async'),
+		get              = require('lodash.get'),
+		connectionParams = {};
 
-    if(options.host.endsWith('/'))
-        options.host = options.host.slice(0, -1);
+	if (options.host.endsWith('/'))
+		options.host = options.host.slice(0, -1);
 
-    connectionParams.host = options.host;
-    connectionParams.port = options.port;
+	if (!isEmpty(options.username) && !isEmpty(options.password)) {
+		connectionParams.username = options.username;
+		connectionParams.password = options.password;
+	}
 
-    if(!isEmpty(options.username) && !isEmpty(options.password)){
-        connectionParams.username = options.username;
-        connectionParams.password = options.password;
-    }
+	if (options.reschedule_pings === false)
+		connectionParams.reschedulePings = false;
 
-    mqttClient = mqtt.connect(connectionParams);
+	if (options.queue_qos_zero === false)
+		connectionParams.queueQoSZero = false;
 
-    mqttClient.on('message', (topic, payload) => {
-        payload = payload.toString();
+	if (options.client_id)
+		connectionParams.clientId = options.client_id;
 
-        async.waterfall([
-            async.constant(payload || '{}'),
-            async.asyncify(JSON.parse)
-        ], (error, data) => {
-            if (error || isEmpty(data)) {
-                return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
-            }
+	if (!isEmpty(options.will_topic)) {
+		connectionParams.will = {
+			topic: options.will_topic,
+			payload: options.will_payload || '',
+			qos: (options.will_qos === 0) ? 0 : options.will_qos || 0,
+			retain: (options.will_retain !== false)
+		};
+	}
 
-            let processData = function (sensorData, cb) {
+	if (options.protocol_version === '3.1') {
+		connectionParams.protocolId = 'MQTT';
+		connectionParams.protocolVersion = 3;
+
+		if (isEmpty(connectionParams.clientId))
+			connectionParams.clientId = uuid.v4();
+	}
+	else {
+		connectionParams.protocolId = 'MQIsdp';
+		connectionParams.protocolVersion = 4;
+	}
+
+	mqttClient = mqtt.connect(`${options.protocol || 'mqtt'}://${options.host}:${options.port}`, connectionParams);
+
+	mqttClient.on('message', (topic, payload) => {
+		payload = payload.toString();
+
+		async.waterfall([
+			async.constant(payload || '{}'),
+			async.asyncify(JSON.parse)
+		], (error, data) => {
+			if (error || isEmpty(data)) {
+				return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
+			}
+
+			let processData = function (sensorData, cb) {
 				let deviceId = get(sensorData, options.device_key || 'device');
 
-				if(isEmpty(deviceId)) {
+				if (isEmpty(deviceId)) {
 					platform.handleException(new Error(`Device ID should be supplied. Data should have a ${options.device_key} property/key. Data: ${sensorData}`));
 					return cb();
 				}
@@ -82,20 +110,20 @@ platform.once('ready', function (options) {
 				cb();
 			};
 
-            if (Array.isArray(data)) {
+			if (Array.isArray(data)) {
 				async.each(data, function (sensorData, cb) {
 					processData(sensorData, cb);
 				});
 			}
 			else
 				processData(data);
-        });
-    });
+		});
+	});
 
-    mqttClient.on('connect', () => {
-        mqttClient.subscribe(options.topic);
+	mqttClient.on('connect', () => {
+		mqttClient.subscribe(options.topic);
 
-        platform.notifyReady();
-        platform.log('MQTT Stream has been initialized.');
-    });
+		platform.notifyReady();
+		platform.log('MQTT Stream has been initialized.');
+	});
 });
