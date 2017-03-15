@@ -1,6 +1,7 @@
 {
   "protocol": {
 	"type": "String",
+	"label": "Protocol",
 	"enum": [
 	  "mqtt",
 	  "mqtts",
@@ -13,6 +14,7 @@
   },
   "protocol_version": {
 	"type": "String",
+	"label": "Protocol Version",
 	"enum": [
 	  "3.1.1",
 	  "3.1"
@@ -41,6 +43,7 @@
   },
   "client_id": {
 	"type": "String",
+	"label": "Client ID",
 	"required": false,
 	"help": "(Optional) The client id to use to connect to the broker. Auto-generated if not supplied."
   },
