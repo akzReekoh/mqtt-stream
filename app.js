@@ -74,6 +74,7 @@ platform.once('ready', function (options) {
 
 	mqttClient.on('message', (topic, payload) => {
 		payload = payload.toString();
+		console.log(payload)
 
 		async.waterfall([
 			async.constant(payload || '{}'),
@@ -124,7 +125,8 @@ platform.once('ready', function (options) {
 		});
 	});
 	
-	mqttClient.on('connect', () => {
+	mqttClient.once('connect', () => {
+		console.log('Connected')
 		mqttClient.subscribe(options.topic);
 
 		platform.notifyReady();
