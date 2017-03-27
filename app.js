@@ -22,6 +22,8 @@ platform.once('close', function () {
 });
 
 platform.once('ready', function (options) {
+	console.log(options);
+
 	let mqtt             = require('mqtt'),
 		isEmpty          = require('lodash.isempty'),
 		async            = require('async'),
@@ -55,16 +57,18 @@ platform.once('ready', function (options) {
 	}
 
 	if (options.protocol_version === '3.1') {
-		connectionParams.protocolId = 'MQTT';
+		connectionParams.protocolId = 'MQIsdp';
 		connectionParams.protocolVersion = 3;
-
-		if (isEmpty(connectionParams.clientId))
-			connectionParams.clientId = uuid.v4();
 	}
 	else {
-		connectionParams.protocolId = 'MQIsdp';
+		connectionParams.protocolId = 'MQTT';
 		connectionParams.protocolVersion = 4;
 	}
+
+  if (isEmpty(options.client_id))
+    connectionParams.clientId = uuid.v4();
+  else
+    connectionParams.clientId = options.client_id;
 
 	mqttClient = mqtt.connect(`${options.protocol || 'mqtt'}://${options.host}:${options.port}`, connectionParams);
 
@@ -119,7 +123,7 @@ platform.once('ready', function (options) {
 				processData(data);
 		});
 	});
-
+	
 	mqttClient.on('connect', () => {
 		mqttClient.subscribe(options.topic);
 
