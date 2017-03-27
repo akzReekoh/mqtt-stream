@@ -118,10 +118,16 @@ platform.once('ready', function (options) {
 			if (Array.isArray(data)) {
 				async.each(data, function (sensorData, cb) {
 					processData(sensorData, cb);
+				}, (err) => {
+					if (err) platform.handleException(err);
 				});
 			}
-			else
-				processData(data);
+			else {
+        processData(data, function (err) {
+          if (err) platform.handleException(err);
+				});
+			}
+
 		});
 	});
 	
