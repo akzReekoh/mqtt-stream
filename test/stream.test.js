@@ -1,71 +1,73 @@
-'use strict';
+'use strict'
 
-const PORT = 8080,
-	HOST = 'localhost',
-    TOPIC = 'message';
+const PORT = 8086
+const	HOST = 'localhost'
+const TOPIC = 'message'
+const Mosca = require('mosca')
 
-var cp     = require('child_process'),
-	assert = require('assert'),
-    Mosca = require('mosca'),
-	stream;
+const amqp = require('amqplib')
 
-describe('Stream', function () {
-	this.slow(5000);
+let _channel = null
+let _conn = null
+let app = null
 
-	after('terminate child process', function (done) {
-	    this.timeout(15000);
-	    setTimeout(() => {
-            stream.kill('SIGKILL');
-            done();
-        }, 10000);
-	});
+describe('HCP MMS Connector Test', () => {
+  before('init', () => {
+    process.env.ACCOUNT = 'adinglasan'
+    process.env.CONFIG = JSON.stringify({
+      host: HOST,
+      port: PORT,
+      topic: TOPIC
+    })
+    process.env.OUTPUT_PIPES = 'op.mqtt1, op.mqtt2'
+    process.env.PLUGIN_ID = 'mqtt.stream'
+    process.env.COMMAND_RELAYS = 'cr1, cr2'
+    process.env.LOGGERS = 'logger1, logger2'
+    process.env.EXCEPTION_LOGGERS = 'ex.logger1, ex.logger2'
+    process.env.BROKER = 'amqp://guest:guest@127.0.0.1/'
 
-	describe('#spawn', function () {
-		it('should spawn a child process', function () {
-			assert.ok(stream = cp.fork(process.cwd()), 'Child process not spawned.');
-		});
-	});
+    amqp.connect(process.env.BROKER)
+      .then((conn) => {
+        _conn = conn
+        return conn.createChannel()
+      }).then((channel) => {
+      _channel = channel
+    }).catch((err) => {
+      console.log(err)
+    })
+  })
 
-	describe('#handShake', function () {
-		it('should notify the parent process when ready within 5 seconds', function (done) {
-			this.timeout(10000);
+  after('close connection', function (done) {
+    _conn.close()
+    done()
+  })
 
-            let server = new Mosca.Server({port: PORT});
+  describe('#start', function () {
+    it('should start the app', function (done) {
+      this.timeout(10000)
 
-			stream.on('message', function (message) {
-				if (message.type === 'ready'){
-				    server.close();
-                    done();
-                }
-			});
+      let server = new Mosca.Server({port: PORT})
 
-			server.on('ready', () => {
-                console.log('Server running');
+      server.on('ready', () => {
+        console.log('Server running')
+        app = require('../app')
 
-                stream.send({
-                    type: 'ready',
-                    data: {
-                        options: {
-                            host: HOST,
-                            port: PORT,
-                            topic: TOPIC
-                        }
-                    }
-                }, function (error) {
-                    assert.ifError(error);
-                });
-            });
+        server.on('clientConnected', (client) => {
+          console.log('Client connected', client.id)
+        })
 
-			server.on('clientConnected', function(client) {
-                console.log('Client connected', client.id);
-
-                console.log('publishing');
-                server.publish({
-                    topic: TOPIC,
-                    payload: JSON.stringify({device: 'device1', data: 'test data'})
-                });
-                console.log('published');
-            });
-		});
-	});
-});
+        app.once('init', () => {
+          setTimeout(() => {
+            console.log('publishing')
+            server.publish({
+              topic: TOPIC,
+              payload: JSON.stringify({device: 'device1', data: 'test data'})
+            })
+            console.log('published')
+            done()
+          }, 5000)
+        })
+      })
+    })
+  })
+})

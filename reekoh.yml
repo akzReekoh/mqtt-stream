@@ -1,0 +1,126 @@
+---
+version: 1.0.0 # So we could parse new versions of the manifest without dropping support for older ones. The CLI should be able to parse the YAML file based on the version
+kind: Plugin # We will add other objects that can be uploaded in the registry like: Add-ons, full-blown applications, bots and others TBD
+metadata:
+  name: mqtt-stream
+  description: MQTT Stream Plugin Reekoh IoT Platform. Connects a Reekoh Instance to MQTT Broker/Server.
+  documentation: ./README.md
+  icon: ./mqtt.png
+  signupLink:
+  type: Stream
+  price: 0
+  tags:
+    - mqtt
+  consumerType: subscribe
+  release:
+    version: 1.0.0
+    notes: path/to/RELEASENOTESv1.0.0.md
+    image: path/to/docker/image
+    config:
+        protocol:
+          type: String
+          enum:
+          - mqtt
+          - mqtts
+          - ws
+          - wss
+          required: false
+          default: mqtt
+          help: "(Optional) The MQTT Protocol to use to connect to the MQTT Broker/Server.
+            Default: mqtt"
+          maxLength: 1000
+        protocolVersion:
+          type: String
+          enum:
+          - 3.1.1
+          - '3.1'
+          required: false
+          default: 3.1.1
+          help: "(Optional) The MQTT Protocol version to use to connect to the MQTT Broker/Server.
+            Default: 3.1.1"
+          maxLength: 1000
+        host:
+          type: String
+          label: Host
+          required: true
+          help: The host/IP address of the MQTT Broker/Server to connect to.
+          maxLength: 1000
+          format:
+            pattern: "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"
+        port:
+          type: Number
+          label: Port
+          required: true
+          help: The port of the MQTT Broker/Server to connect to.
+        topic:
+          type: String
+          label: Topic
+          required: true
+          help: The topic to subscribe to for data.
+          maxLength: 1000
+        clientId:
+          type: String
+          required: false
+          help: "(Optional) The client id to use to connect to the broker. Auto-generated
+            if not supplied."
+          maxLength: 1000
+        user:
+          type: String
+          label: Username
+          help: "(Optional) The username to use to authenticate with the MQTT Broker/Server."
+          required: false
+          maxLength: 1000
+        password:
+          type: Password
+          label: Password
+          help: "(Optional) The password to use to authenticate with the MQTT Broker/Server."
+          required: false
+        reschedulePings:
+          type: Boolean
+          label: Reschedule Pings
+          required: false
+          default: true
+          help: 'Reschedule ping messages after sending packets. Default: true'
+        queueQosZero:
+          type: Boolean
+          label: Queue QoS Zero
+          required: false
+          default: true
+          help: 'Queue outgoing QoS 0 packets. Default: true'
+        willTopic:
+          type: String
+          label: Will Topic
+          required: false
+          help: The will topic.
+          maxLength: 1000
+        willQos:
+          type: Number
+          label: Will QoS
+          required: false
+          default: 0
+          help: 'The will QoS. Default: 0'
+          maxLength: 1000
+        willRetain:
+          type: Boolean
+          label: Will Retain
+          required: false
+          default: false
+          help: 'Will retain flag. Default: false'
+        willPayload:
+          type: String
+          label: Will Payload
+          required: false
+          help: The will payload.
+          maxLength: 1000
+        deviceKey:
+          type: String
+          label: Device ID Property/Key
+          required: false
+          help: The key or property where the device id will be pulled from. Defaults to 'device'
+          maxLength: 1000
+        sequenceKey:
+          type: String
+          label: Sequence Key
+          required: false
+          help: The key name for the sequence ID to use.
+          maxLength: 1000

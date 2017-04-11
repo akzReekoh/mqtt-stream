@@ -1,141 +1,112 @@
-'use strict';
+'use strict'
 
-var platform = require('./platform'),
-	uuid     = require('uuid'),
-	mqttClient;
+let reekoh = require('reekoh')
+let _plugin = new reekoh.plugins.Stream()
+let uuid = require('uuid')
+let mqttClient = null
 
-platform.once('close', function () {
-	let d = require('domain').create();
+_plugin.once('ready', () => {
+  let mqtt = require('mqtt')
+  let isEmpty = require('lodash.isempty')
+  let async = require('async')
+  let get = require('lodash.get')
+  let connectionParams = {}
 
-	d.once('error', function (error) {
-		console.error(error);
-		platform.handleException(error);
-		platform.notifyClose();
-		d.exit();
-	});
+  if (_plugin.config.host.endsWith('/')) _plugin.config.host = _plugin.config.host.slice(0, -1)
 
-	d.run(function () {
-		mqttClient.end();
-		platform.notifyClose();
-		d.exit();
-	});
-});
+  if (!isEmpty(_plugin.config.username) && !isEmpty(_plugin.config.password)) {
+    connectionParams.username = _plugin.config.username
+    connectionParams.password = _plugin.config.password
+  }
 
-platform.once('ready', function (options) {
-	console.log(options);
+  if (_plugin.config.reschedulePings === false) connectionParams.reschedulePings = false
 
-	let mqtt             = require('mqtt'),
-		isEmpty          = require('lodash.isempty'),
-		async            = require('async'),
-		get              = require('lodash.get'),
-		connectionParams = {};
+  if (_plugin.config.queueQosZero === false) connectionParams.queueQoSZero = false
 
-	if (options.host.endsWith('/'))
-		options.host = options.host.slice(0, -1);
+  if (_plugin.config.clientId) connectionParams.clientId = _plugin.config.clientId
 
-	if (!isEmpty(options.username) && !isEmpty(options.password)) {
-		connectionParams.username = options.username;
-		connectionParams.password = options.password;
-	}
+  if (!isEmpty(_plugin.config.willTopic)) {
+    connectionParams.will = {
+      topic: _plugin.config.willTopic,
+      payload: _plugin.config.willPayload || '',
+      qos: (_plugin.config.willQos === 0) ? 0 : _plugin.config.willQos || 0,
+      retain: (_plugin.config.willRetain !== false)
+    }
+  }
 
-	if (options.reschedule_pings === false)
-		connectionParams.reschedulePings = false;
+  if (_plugin.config.protocolVersion === '3.1') {
+    connectionParams.protocolId = 'MQTT'
+    connectionParams.protocolVersion = 3
 
-	if (options.queue_qos_zero === false)
-		connectionParams.queueQoSZero = false;
+    if (isEmpty(connectionParams.clientId)) connectionParams.clientId = uuid.v4()
+  } else {
+    connectionParams.protocolId = 'MQIsdp'
+    connectionParams.protocolVersion = 4
+  }
 
-	if (options.client_id)
-		connectionParams.clientId = options.client_id;
+  mqttClient = mqtt.connect(`${_plugin.config.protocol || 'mqtt'}://${_plugin.config.host}:${_plugin.config.port}`, connectionParams)
 
-	if (!isEmpty(options.will_topic)) {
-		connectionParams.will = {
-			topic: options.will_topic,
-			payload: options.will_payload || '',
-			qos: (options.will_qos === 0) ? 0 : options.will_qos || 0,
-			retain: (options.will_retain !== false)
-		};
-	}
+  mqttClient.on('message', (topic, payload) => {
+    payload = payload.toString()
 
-	if (options.protocol_version === '3.1') {
-		connectionParams.protocolId = 'MQIsdp';
-		connectionParams.protocolVersion = 3;
-	}
-	else {
-		connectionParams.protocolId = 'MQTT';
-		connectionParams.protocolVersion = 4;
-	}
+    async.waterfall([
+      async.constant(payload || '{}'),
+      async.asyncify(JSON.parse)
+    ], (error, data) => {
+      if (error || isEmpty(data)) {
+        return _plugin.logException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`))
+      }
 
-  if (isEmpty(options.client_id))
-    connectionParams.clientId = uuid.v4();
-  else
-    connectionParams.clientId = options.client_id;
+      let processData = function (sensorData, cb) {
+        let deviceId = get(sensorData, _plugin.config.deviceKey || 'device')
 
-	mqttClient = mqtt.connect(`${options.protocol || 'mqtt'}://${options.host}:${options.port}`, connectionParams);
+        if (isEmpty(deviceId)) {
+          _plugin.logException(new Error(`Device ID should be supplied. Data should have a ${_plugin.config.deviceKey} property/key. Data: ${sensorData}`))
+          return cb()
+        }
+        _plugin.requestDeviceInfo(deviceId)
+          .then((deviceInfo) => {
+            if (deviceInfo) {
+              delete sensorData[_plugin.config.deviceKey || 'device']
+              _plugin.pipe(deviceInfo, get(data, _plugin.config.sequenceKey))
+                .then(() => {
+                  _plugin.log(JSON.stringify({
+                    title: 'MQTT Stream - Data Received',
+                    device: sensorData.device,
+                    data: sensorData
+                  }))
+                })
+                .catch((error) => {
+                  _plugin.logException(error)
+                })
+            } else _plugin.logException(new Error(`Device ${sensorData.device} not registered`))
+          })
+          .catch((error) => {
+            _plugin.logException(error)
+          })
+        cb()
+      }
 
-	mqttClient.on('message', (topic, payload) => {
-		payload = payload.toString();
-		console.log(payload)
+      if (Array.isArray(data)) {
+        async.each(data, function (sensorData, cb) {
+          processData(sensorData, cb)
+        }, (err) => {
+          if (err) _plugin.logException(err)
+        })
+      } else {
+        processData(data, (error) => {
+          if (error) _plugin.logException(error)
+        })
+      }
+    })
+  })
 
-		async.waterfall([
-			async.constant(payload || '{}'),
-			async.asyncify(JSON.parse)
-		], (error, data) => {
-			if (error || isEmpty(data)) {
-				return platform.handleException(new Error(`Invalid data. Data must be a valid JSON String. Raw Message: ${payload}`));
-			}
+  mqttClient.once('connect', () => {
+    mqttClient.subscribe(_plugin.config.topic)
 
-			let processData = function (sensorData, cb) {
-				let deviceId = get(sensorData, options.device_key || 'device');
+    _plugin.log('MQTT Stream has been initialized.')
+    _plugin.emit('init')
+  })
+})
 
-				if (isEmpty(deviceId)) {
-					platform.handleException(new Error(`Device ID should be supplied. Data should have a ${options.device_key} property/key. Data: ${sensorData}`));
-					return cb();
-				}
-
-				platform.requestDeviceInfo(deviceId, function (error, requestId) {
-					platform.once(requestId, function (deviceInfo) {
-						if (deviceInfo) {
-							delete sensorData[options.device_key || 'device'];
-
-							platform.processData(deviceId, JSON.stringify(Object.assign(sensorData, {
-								device: deviceId
-							})));
-
-							platform.log(JSON.stringify({
-								title: 'MQTT Stream - Data Received',
-								device: sensorData.device,
-								data: sensorData
-							}));
-						}
-						else
-							platform.handleException(new Error(`Device ${sensorData.device} not registered`));
-					});
-				});
-
-				cb();
-			};
-
-			if (Array.isArray(data)) {
-				async.each(data, function (sensorData, cb) {
-					processData(sensorData, cb);
-				}, (err) => {
-					if (err) platform.handleException(err);
-				});
-			}
-			else {
-        processData(data, function (err) {
-          if (err) platform.handleException(err);
-				});
-			}
-
-		});
-	});
-	
-	mqttClient.once('connect', () => {
-		console.log('Connected')
-		mqttClient.subscribe(options.topic);
-
-		platform.notifyReady();
-		platform.log('MQTT Stream has been initialized.');
-	});
-});
+module.exports = _plugin
